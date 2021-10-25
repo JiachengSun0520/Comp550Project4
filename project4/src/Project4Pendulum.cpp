@@ -25,7 +25,8 @@ public:
     unsigned int getDimension() const override
     {
         // TODO: The dimension of your projection for the pendulum
-        return 0;
+        // 2 dimension
+        return 2;
     }
 
     void project(const ompl::base::State */* state */, Eigen::Ref<Eigen::VectorXd> /* projection */) const override
