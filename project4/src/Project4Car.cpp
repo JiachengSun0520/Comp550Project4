@@ -167,8 +167,8 @@ oc::SimpleSetupPtr createCar(std::vector<Rectangle> & obstacles)
     auto cspace(std::make_shared<oc::RealVectorControlSpace>(space, 2));
     ob::RealVectorBounds cbounds(2);
     // omega
-    cbounds.setLow(0, -2);
-    cbounds.setHigh(0, 2);
+    cbounds.setLow(0, -3);
+    cbounds.setHigh(0, 3);
     // v
     cbounds.setLow(1, 0);
     cbounds.setHigh(1, 1);
@@ -193,7 +193,7 @@ oc::SimpleSetupPtr createCar(std::vector<Rectangle> & obstacles)
 
 
     // start state
-    ob::ScopedState<ob::RealVectorStateSpace> start(space);
+    ob::ScopedState<ob::CompoundStateSpace> start(space);
     start[0] = -6;
     start[1] = -5;
     start[2] = 0;
@@ -201,13 +201,13 @@ oc::SimpleSetupPtr createCar(std::vector<Rectangle> & obstacles)
 
 
     // goal state
-    ob::ScopedState<ob::RealVectorStateSpace> goal(space);
+    ob::ScopedState<ob::CompoundStateSpace> goal(space);
     goal[0] = 6;
     goal[1] = 5;
-    goal[2] = 0;
-    goal[3] = 0;
+    // goal[2] = 0;
+    // goal[3] = 1;
 
-    ss->setStartAndGoalStates(start, goal, 0.05);
+    ss->setStartAndGoalStates(start, goal, 2);
 
     return ss;
 }
@@ -217,22 +217,28 @@ void planCar(oc::SimpleSetupPtr & ss, int choice)
     // TODO: Do some motion planning for the car
     // choice is what planner to use.
     oc::SimpleSetup *s = ss.get();
+    ss->getSpaceInformation()->setPropagationStepSize(0.1);
     switch (choice){
-        case 1:
+        case 1: {
             s->setPlanner(std::make_shared<oc::RRT>(s->getSpaceInformation()));
             break;
-        case 2:
+        }
+        case 2: {
             auto planner = std::make_shared<oc::KPIECE1>(s->getSpaceInformation());
             s->getStateSpace()->registerProjection("CarProjection", ob::ProjectionEvaluatorPtr(new CarProjection(s->getStateSpace().get())));
             planner->setProjectionEvaluator("CarProjection");
             s->setPlanner(planner);
             break;
+        }
+        case 3: {
+            s->setPlanner(std::make_shared<oc::RGRRT>(s->getSpaceInformation()));
+        }
 
 
     }
     
     ss->setup();
-    ob::PlannerStatus solved = ss->solve(10.0);
+    ob::PlannerStatus solved = ss->solve(360);
 
     if (solved) {
         std::cout << "Found solution:" << std::endl;
@@ -243,9 +249,31 @@ void planCar(oc::SimpleSetupPtr & ss, int choice)
 
 }
 
-void benchmarkCar(oc::SimpleSetupPtr /*& ss*/)
+void benchmarkCar(oc::SimpleSetupPtr & ss)
 {
-    // TODO: Do some benchmarking for the car
+    oc::SimpleSetup *s = ss.get();
+    ss->getSpaceInformation()->setPropagationStepSize(0.1);
+    // space->registerDefaultProjection(ompl::base::ProjectionEvaluatorPtr(new PendulumProjection(space)));
+    // ompl::tools::Benchmark b(*ss, "Pendulum Benchmark");
+    ompl::tools::Benchmark b(*ss, "CarBenchmark");
+    b.addPlanner(std::make_shared<oc::RRT>(s->getSpaceInformation()));
+
+
+    auto planner = std::make_shared<oc::KPIECE1>(s->getSpaceInformation());
+    s->getStateSpace()->registerProjection("CarProjection", ob::ProjectionEvaluatorPtr(new CarProjection(s->getStateSpace().get())));
+    planner->setProjectionEvaluator("CarProjection");
+    b.addPlanner(planner);
+    b.addPlanner(std::make_shared<oc::RGRRT>(s->getSpaceInformation()));
+    
+    
+
+    double time = 360;
+    double memory = 1000;
+    int runCount = 20;
+
+    ompl::tools::Benchmark::Request request(time, memory, runCount);
+    b.benchmark(request);
+    b.saveResultsToFile();
 }
 
 int main(int /* argc */, char ** /* argv */)

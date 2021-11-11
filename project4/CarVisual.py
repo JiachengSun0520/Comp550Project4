@@ -1,7 +1,7 @@
 import numpy
 import matplotlib.pyplot as plt
 
-data = numpy.loadtxt('CarRRT.txt')
+data = numpy.loadtxt('CarRGRRT.txt')
 #fig = plt.figure()
 #ax = fig.gca(projection = '3d')
 #ax.plot(data[:,0],data[:,1])

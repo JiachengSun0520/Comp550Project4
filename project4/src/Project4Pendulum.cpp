@@ -22,6 +22,8 @@
 #include <ompl/control/planners/rrt/RRT.h>
 #include <ompl/control/planners/kpiece/KPIECE1.h>
 #include <cmath>
+
+#include <ompl/tools/benchmark/Benchmark.h>
 namespace ob = ompl::base;
 namespace oc = ompl::control;
 
@@ -123,12 +125,13 @@ ompl::control::SimpleSetupPtr createPendulum(double torque)
     auto r1(std::make_shared<ompl::base::RealVectorStateSpace>(1));
 
     ompl::base::RealVectorBounds bounds(1);
-    bounds.setLow(-5);
-    bounds.setHigh(5);
+    bounds.setLow(-10);
+    bounds.setHigh(10);
 
     r1->setBounds(bounds);
     auto space = so2 + r1;
 
+    // space->registerDefaultProjection(ompl::base::ProjectionEvaluatorPtr(new PendulumProjection(space.get())));
     // create a control space
     auto cspace(std::make_shared<DemoControlSpace>(space));
 
@@ -170,8 +173,9 @@ ompl::control::SimpleSetupPtr createPendulum(double torque)
     goal[1] = 0;
     
     // set the start and goal states
-    ss->setStartAndGoalStates(start, goal, 0.05);
+    ss->setStartAndGoalStates(start, goal, 0.3);
     
+
     ss->setup();
     
     return ss;
@@ -181,21 +185,27 @@ void planPendulum(ompl::control::SimpleSetupPtr & ss , int  choice )
 {
     // TODO: Do some motion planning for the pendulum
     // choice is what planner to use.
-
+    ss->getSpaceInformation()->setPropagationStepSize(0.1);
     oc::SimpleSetup *s = ss.get();
     switch(choice) {
-        case 1:
+        case 1: {
             s->setPlanner(std::make_shared<oc::RRT>(s->getSpaceInformation()));
             break;
-        case 2:
+        }
+        case 2: {
             auto planner = std::make_shared<oc::KPIECE1>(s->getSpaceInformation());
             s->getStateSpace()->registerProjection("PendulumProjection", ob::ProjectionEvaluatorPtr(new PendulumProjection(s->getStateSpace().get())));
             planner->setProjectionEvaluator("PendulumProjection");
             s->setPlanner(planner);
+            break;
+        }
+        case 3: {
+            s->setPlanner(std::make_shared<oc::RGRRT>(s->getSpaceInformation()));
+        }
     }
 
     // attempt to solve the problem within one second of planning time
-    ob::PlannerStatus solved = ss->solve(10.0);
+    ob::PlannerStatus solved = ss->solve(20.0);
 
     if (solved)
     {
@@ -210,9 +220,32 @@ void planPendulum(ompl::control::SimpleSetupPtr & ss , int  choice )
         std::cout << "No solution found" << std::endl;
 }
 
-void benchmarkPendulum(ompl::control::SimpleSetupPtr &/* ss */)
+void benchmarkPendulum(ompl::control::SimpleSetupPtr & ss )
 {
-    // TODO: Do some benchmarking for the pendulum
+    
+    oc::SimpleSetup *s = ss.get();
+    ss->getSpaceInformation()->setPropagationStepSize(0.1);
+    // space->registerDefaultProjection(ompl::base::ProjectionEvaluatorPtr(new PendulumProjection(space)));
+    // ompl::tools::Benchmark b(*ss, "Pendulum Benchmark");
+    ompl::tools::Benchmark b(*ss, "PendulumBenchmark");
+    b.addPlanner(std::make_shared<oc::RRT>(s->getSpaceInformation()));
+
+
+    auto planner = std::make_shared<oc::KPIECE1>(s->getSpaceInformation());
+    s->getStateSpace()->registerProjection("PendulumProjection", ob::ProjectionEvaluatorPtr(new PendulumProjection(s->getStateSpace().get())));
+    planner->setProjectionEvaluator("PendulumProjection");
+    b.addPlanner(planner);
+    b.addPlanner(std::make_shared<oc::RGRRT>(s->getSpaceInformation()));
+    
+    
+
+    double time = 30;
+    double memory = 1000;
+    int runCount = 50;
+
+    ompl::tools::Benchmark::Request request(time, memory, runCount);
+    b.benchmark(request);
+    b.saveResultsToFile();
 }
 
 int main(int /*argc*/, char ** /* argv*/)
